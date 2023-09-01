@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  agent:
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+    entrypoint: /usr/src/app/entrypoint.sh
+    restart: always
+    environment:
+      - DEBUG=0
+    volumes:
+      - ./agent:/usr/src/app
+      - ./scan_results:/usr/src/scan_results
+    #   - github_repos:/usr/src/github
+    #   - wordlist:/usr/src/wordlist
+    #   - gf_patterns:/root/.gf
+    #   - nuclei_templates:/root/nuclei-templates
+    #   - tool_config:/root/.config
+    # ports:
+    #   - "5000:5000" # Flask port is not expose since it is accessed by proxy
+    networks:
+      rengine-agent_network:
+        aliases:
+          - rengine-agent
+  proxy:
+    restart: always
+    image: nginx:alpine
+    ports:
+      - 1234:1234/tcp # for reverse proxy
+      - 4321:4321/tcp # for testing the connection
+    depends_on:
+      - agent
+    secrets:
+      - source: proxy.ca
+        target: /etc/nginx/certs/ca.crt
+      - source: proxy.cert
+        target: /etc/nginx/certs/server.crt
+      - source: proxy.key
+        target: /etc/nginx/certs/server.key
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/nginx.conf:ro
+    networks:
+      - rengine-agent_network
+
+networks:
+  rengine-agent_network:
+
+
+secrets:
+  proxy.ca:
+    file: ./nginx/certs/ca.crt
+  proxy.key:
+    file: ./nginx/certs/server.key
+  proxy.cert:
+    file: ./nginx/certs/server.crt
